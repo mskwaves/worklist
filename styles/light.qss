@@ -1,0 +1,4 @@
+    QMainWindow, QWidget { background-color: #f0f0f0; color: #000000; }
+    QLineEdit, QListWidget, QComboBox { background-color: #ffffff; color: #000000; border: 1px solid #cccccc; padding: 4px; }
+    QPushButton { background-color: #e0e0e0; color: #000000; border: 1px solid #cccccc; border-radius: 4px; padding: 6px; }
+    QPushButton:hover { background-color: #d0d0d0; }
