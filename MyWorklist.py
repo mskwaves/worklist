@@ -22,7 +22,7 @@ class MainWindow(QMainWindow):
         self.time_left = 1 * 60
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_timer)
-        self.timer_label = QLabel("1:00", self)
+        self.timer_label = QLabel("30:00", self)
 
         self.setWindowTitle("WorkList")
         self.setWindowIcon(QIcon("icons/to-do-list_light.png"))
@@ -163,7 +163,7 @@ class MainWindow(QMainWindow):
 
         if self.timer.isActive():
             self.timer.stop()
-            self.timer_label.setText("1:00")
+            self.timer_label.setText("30:00")
             self.focus_button.setText("Фокус")
             self.add_button.setEnabled(True)
             self.delete_task.setEnabled(True)
@@ -177,7 +177,7 @@ class MainWindow(QMainWindow):
         self.open_csv.setEnabled(False)
 
         self.focus_button.setText("Стоп")
-        self.time_left = 1 * 60
+        self.time_left = 30 * 60
         self.timer.start(1000)
 
     def update_timer(self):
