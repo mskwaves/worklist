@@ -1,10 +1,11 @@
 import sys
 import os
+import db
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLineEdit, QPushButton, QListWidget, \
-    QMessageBox, QFileDialog, QComboBox, QHBoxLayout, QLabel
+    QMessageBox, QFileDialog, QComboBox, QHBoxLayout, QLabel, QListWidgetItem
 from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, Qt
 from edit_dialog import EditDialog
 
 if getattr(sys, 'frozen', False):
@@ -67,14 +68,24 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(self.load_qss("styles/dark.qss"))
         self.timer_label.setStyleSheet("font-size: 16px; font-weight: bold;")
         self.update_icons()
+        self.load_tasks_from_db()
+
+    def load_tasks_from_db(self):
+        rows = db.load_tasks()
+        for row in rows:
+            item = QListWidgetItem(f"[{row['priority']}] {row['text']}")
+            item.setData(Qt.ItemDataRole.UserRole, row["id"])
+            self.task_list.addItem(item)
 
     def add_task(self):
         text = self.input_field.text()
         if not text:
             return
         priority = self.priority_box.currentText()
-        full_text = f"[{priority}] {text}"
-        self.task_list.addItem(full_text)
+        task_id = db.add_task(text, priority)
+        item = QListWidgetItem(f"[{priority}] {text}")
+        item.setData(Qt.ItemDataRole.UserRole, task_id)
+        self.task_list.addItem(item)
         self.input_field.clear()
 
     def delete_task_action(self):
@@ -91,6 +102,8 @@ class MainWindow(QMainWindow):
             QMessageBox.StandardButton.No  # Кнопка по умолчанию - "Нет"
         )
         if reply == QMessageBox.StandardButton.Yes:
+            task_id = item.data(Qt.ItemDataRole.UserRole)
+            db.delete_task(task_id)
             row = self.task_list.row(item)
             self.task_list.takeItem(row)
 
@@ -109,9 +122,13 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Готово", f"Сохранено {self.task_list.count()} задач")
 
     def open_csv_action(self):
-        file_name, _ = QFileDialog.getOpenFileName(self, "Открыть текст", "", "CSV (*.csv);;All Files (*)")
+        file_name, _ = QFileDialog.getOpenFileName(self, "Открыть текст", "", "CSV и TXT (*.csv *.txt)")
         if not file_name:
-            return
+           return
+        ext = os.path.splitext(file_name)[1].lower()
+        if ext not in (".csv", ".txt"):
+           QMessageBox.warning(self, "Ошибка", "Можно открыть только файл CSV или TXT!")
+           return
         try:  # Если выбрали файл
             with open(file_name, 'r', encoding='utf-8') as file:  # 'r' — read, как чтение книги
                 lines = file.readlines()
@@ -200,6 +217,7 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == '__main__':
+    db.init_db()
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
