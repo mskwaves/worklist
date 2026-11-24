@@ -35,11 +35,14 @@ class MainWindow(QMainWindow):
         self.focus_button = QPushButton("Фокус", self)
         self.theme_button.setFixedWidth(100)
         self.input_field = QLineEdit(self)
+        self.search_field = QLineEdit(self)
+        self.search_field.setPlaceholderText("Поиск задач...")
         self.add_button = QPushButton("\tДобавить", self)
         self.task_list = QListWidget(self)
         self.delete_task = QPushButton("\tУдалить")
+        self.complete_task = QPushButton("\tВыполнено", self)
         self.save_csv = QPushButton("\tСохранить в CSV", self)
-        self.open_csv = QPushButton("\tЗагрузить CSV", self)
+        self.open_file = QPushButton("\tЗагрузить файл", self)
         self.priority_box = QComboBox(self)
         self.priority_box.addItems(["Обычный", "Важный", "Срочный"])
 
@@ -50,32 +53,46 @@ class MainWindow(QMainWindow):
         top_layout.addWidget(self.timer_label)
         layout.addLayout(top_layout)
         layout.addWidget(self.input_field)
+        layout.addWidget(self.search_field)
         layout.addWidget(self.add_button)
         layout.addWidget(self.task_list)
         layout.addWidget(self.delete_task)
+        layout.addWidget(self.complete_task)
         layout.addWidget(self.save_csv)
-        layout.addWidget(self.open_csv)
+        layout.addWidget(self.open_file)
         layout.addWidget(self.priority_box)
 
         self.add_button.clicked.connect(self.add_task)
         self.delete_task.clicked.connect(self.delete_task_action)
+        self.complete_task.clicked.connect(self.complete_task_action)
         self.save_csv.clicked.connect(self.save_csv_action)
-        self.open_csv.clicked.connect(self.open_csv_action)
+        self.open_file.clicked.connect(self.open_file_action)
         self.task_list.itemDoubleClicked.connect(self.edit_task_action)
         self.theme_button.clicked.connect(self.toggle_theme)
         self.focus_button.clicked.connect(self.focus_mode)
+        self.search_field.textChanged.connect(self.filter_tasks)
 
         self.setStyleSheet(self.load_qss("styles/dark.qss"))
         self.timer_label.setStyleSheet("font-size: 16px; font-weight: bold;")
         self.update_icons()
         self.load_tasks_from_db()
 
+    def add_row_to_list(self, row):
+        item = QListWidgetItem(f"[{row['priority']}] {row['text']}")
+        item.setData(Qt.ItemDataRole.UserRole, row["id"])
+        item.setData(Qt.ItemDataRole.UserRole + 1, row["priority"])
+        item.setData(Qt.ItemDataRole.UserRole + 2, row["text"])
+        self.task_list.addItem(item)
+
     def load_tasks_from_db(self):
-        rows = db.load_tasks()
-        for row in rows:
-            item = QListWidgetItem(f"[{row['priority']}] {row['text']}")
-            item.setData(Qt.ItemDataRole.UserRole, row["id"])
-            self.task_list.addItem(item)
+        for row in db.load_tasks():
+            self.add_row_to_list(row)
+
+    def filter_tasks(self):
+        query = self.search_field.text().strip()
+        self.task_list.clear()
+        for row in db.search_tasks(query):
+            self.add_row_to_list(row)
 
     def add_task(self):
         text = self.input_field.text()
@@ -85,6 +102,8 @@ class MainWindow(QMainWindow):
         task_id = db.add_task(text, priority)
         item = QListWidgetItem(f"[{priority}] {text}")
         item.setData(Qt.ItemDataRole.UserRole, task_id)
+        item.setData(Qt.ItemDataRole.UserRole + 1, priority)
+        item.setData(Qt.ItemDataRole.UserRole + 2, text)
         self.task_list.addItem(item)
         self.input_field.clear()
 
@@ -107,6 +126,15 @@ class MainWindow(QMainWindow):
             row = self.task_list.row(item)
             self.task_list.takeItem(row)
 
+    def complete_task_action(self):
+        item = self.task_list.currentItem()
+        if not item:
+            QMessageBox.warning(self, "Ошибка", "Выберите задачу, чтобы отметить выполненной")
+            return
+        task_id = item.data(Qt.ItemDataRole.UserRole)
+        if db.archive_task(task_id):
+            self.task_list.takeItem(self.task_list.row(item))
+
     def save_csv_action(self):
         path, _ = QFileDialog.getSaveFileName(self, "Сохранить задачи", f"tasks.csv", "CSV (*.csv)")
         if not path:
@@ -114,15 +142,16 @@ class MainWindow(QMainWindow):
         try:
             with open(path, "w", encoding='utf-8', newline="") as f:
                 for i in range(self.task_list.count()):
-                    text = self.task_list.item(i).text()
+                    item = self.task_list.item(i)
+                    text = item.data(Qt.ItemDataRole.UserRole + 2) or item.text()
                     f.write(text + "\n")
         except OSError as e:
             QMessageBox.warning(self, "Ошибка", f"Не удалось сохранить: {e}")
             return
         QMessageBox.information(self, "Готово", f"Сохранено {self.task_list.count()} задач")
 
-    def open_csv_action(self):
-        file_name, _ = QFileDialog.getOpenFileName(self, "Открыть текст", "", "CSV и TXT (*.csv *.txt)")
+    def open_file_action(self):
+        file_name, _ = QFileDialog.getOpenFileName(self, "Открыть файл", "", "CSV и TXT (*.csv *.txt)")
         if not file_name:
            return
         ext = os.path.splitext(file_name)[1].lower()
@@ -135,18 +164,31 @@ class MainWindow(QMainWindow):
         except OSError as e:
             QMessageBox.warning(self, "Ошибка", f"Не удалось прочитать: {e}")
             return
+        added = 0
         for line in lines:
             line = line.strip()
             if line:
-                self.task_list.addItem(line)
-        QMessageBox.information(self, "Готово", f"Загружено {len(lines)} задач")
+                task_id = db.add_task(line, "Обычный")
+                item = QListWidgetItem(f"[Обычный] {line}")
+                item.setData(Qt.ItemDataRole.UserRole, task_id)
+                item.setData(Qt.ItemDataRole.UserRole + 1, "Обычный")
+                item.setData(Qt.ItemDataRole.UserRole + 2, line)
+                self.task_list.addItem(item)
+                added += 1
+        QMessageBox.information(self, "Готово", f"Загружено {added} задач")
 
     def edit_task_action(self, item):
-        current_text = item.text()
+        current_text = item.data(Qt.ItemDataRole.UserRole + 2) or item.text()
         dialog = EditDialog(current_text, self)
         if dialog.exec():
-            new_text = dialog.get_text()
-            item.setText(new_text)
+            new_text = dialog.get_text().strip()
+            if not new_text:
+                return
+            task_id = item.data(Qt.ItemDataRole.UserRole)
+            priority = item.data(Qt.ItemDataRole.UserRole + 1)
+            db.update_task(task_id, new_text, priority)
+            item.setText(f"[{priority}] {new_text}")
+            item.setData(Qt.ItemDataRole.UserRole + 2, new_text)
 
     def load_qss(self, filepath):
         try:
@@ -169,8 +211,9 @@ class MainWindow(QMainWindow):
 
         self.add_button.setIcon(QIcon(f"icons/add_{theme}.png"))
         self.delete_task.setIcon(QIcon(f"icons/delete_{theme}.png"))
+        self.complete_task.setIcon(QIcon(f"icons/check_{theme}.png"))
         self.save_csv.setIcon(QIcon(f"icons/save_{theme}.png"))
-        self.open_csv.setIcon(QIcon(f"icons/open_{theme}.png"))
+        self.open_file.setIcon(QIcon(f"icons/open_{theme}.png"))
         self.setWindowIcon(QIcon(f"icons/to-do-list_{theme}.png"))
 
     def focus_mode(self):
@@ -184,14 +227,16 @@ class MainWindow(QMainWindow):
             self.focus_button.setText("Фокус")
             self.add_button.setEnabled(True)
             self.delete_task.setEnabled(True)
+            self.complete_task.setEnabled(True)
             self.save_csv.setEnabled(True)
-            self.open_csv.setEnabled(True)
+            self.open_file.setEnabled(True)
             return
 
         self.add_button.setEnabled(False)
         self.delete_task.setEnabled(False)
+        self.complete_task.setEnabled(False)
         self.save_csv.setEnabled(False)
-        self.open_csv.setEnabled(False)
+        self.open_file.setEnabled(False)
 
         self.focus_button.setText("Стоп")
         self.time_left = 30 * 60
@@ -211,8 +256,9 @@ class MainWindow(QMainWindow):
 
             self.add_button.setEnabled(True)
             self.delete_task.setEnabled(True)
+            self.complete_task.setEnabled(True)
             self.save_csv.setEnabled(True)
-            self.open_csv.setEnabled(True)
+            self.open_file.setEnabled(True)
             QMessageBox.information(self, "Молодец!", "Время вышло! Можешь отдохнуть")
 
 
