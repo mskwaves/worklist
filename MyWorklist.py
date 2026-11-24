@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLi
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QTimer, Qt
 from edit_dialog import EditDialog
+from archive_window import ArchiveWindow
 
 if getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS  # Папка, куда EXE распаковывает файлы
@@ -27,7 +28,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("WorkList")
         self.setWindowIcon(QIcon("icons/to-do-list_light.png"))
-        self.setGeometry(400, 400, 400, 400)
+        self.setGeometry(400, 300, 480, 620)
 
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
@@ -41,6 +42,7 @@ class MainWindow(QMainWindow):
         self.task_list = QListWidget(self)
         self.delete_task = QPushButton("\tУдалить")
         self.complete_task = QPushButton("\tВыполнено", self)
+        self.archive_button = QPushButton("\tАрхив", self)
         self.save_csv = QPushButton("\tСохранить в CSV", self)
         self.open_file = QPushButton("\tЗагрузить файл", self)
         self.priority_box = QComboBox(self)
@@ -58,6 +60,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.task_list)
         layout.addWidget(self.delete_task)
         layout.addWidget(self.complete_task)
+        layout.addWidget(self.archive_button)
         layout.addWidget(self.save_csv)
         layout.addWidget(self.open_file)
         layout.addWidget(self.priority_box)
@@ -65,6 +68,7 @@ class MainWindow(QMainWindow):
         self.add_button.clicked.connect(self.add_task)
         self.delete_task.clicked.connect(self.delete_task_action)
         self.complete_task.clicked.connect(self.complete_task_action)
+        self.archive_button.clicked.connect(self.open_archive)
         self.save_csv.clicked.connect(self.save_csv_action)
         self.open_file.clicked.connect(self.open_file_action)
         self.task_list.itemDoubleClicked.connect(self.edit_task_action)
@@ -134,6 +138,10 @@ class MainWindow(QMainWindow):
         task_id = item.data(Qt.ItemDataRole.UserRole)
         if db.archive_task(task_id):
             self.task_list.takeItem(self.task_list.row(item))
+
+    def open_archive(self):
+        window = ArchiveWindow(self)
+        window.exec()
 
     def save_csv_action(self):
         path, _ = QFileDialog.getSaveFileName(self, "Сохранить задачи", f"tasks.csv", "CSV (*.csv)")
@@ -212,6 +220,7 @@ class MainWindow(QMainWindow):
         self.add_button.setIcon(QIcon(f"icons/add_{theme}.png"))
         self.delete_task.setIcon(QIcon(f"icons/delete_{theme}.png"))
         self.complete_task.setIcon(QIcon(f"icons/check_{theme}.png"))
+        self.archive_button.setIcon(QIcon(f"icons/archive_{theme}.png"))
         self.save_csv.setIcon(QIcon(f"icons/save_{theme}.png"))
         self.open_file.setIcon(QIcon(f"icons/open_{theme}.png"))
         self.setWindowIcon(QIcon(f"icons/to-do-list_{theme}.png"))
@@ -228,6 +237,7 @@ class MainWindow(QMainWindow):
             self.add_button.setEnabled(True)
             self.delete_task.setEnabled(True)
             self.complete_task.setEnabled(True)
+            self.archive_button.setEnabled(True)
             self.save_csv.setEnabled(True)
             self.open_file.setEnabled(True)
             return
@@ -235,6 +245,7 @@ class MainWindow(QMainWindow):
         self.add_button.setEnabled(False)
         self.delete_task.setEnabled(False)
         self.complete_task.setEnabled(False)
+        self.archive_button.setEnabled(False)
         self.save_csv.setEnabled(False)
         self.open_file.setEnabled(False)
 
@@ -257,6 +268,7 @@ class MainWindow(QMainWindow):
             self.add_button.setEnabled(True)
             self.delete_task.setEnabled(True)
             self.complete_task.setEnabled(True)
+            self.archive_button.setEnabled(True)
             self.save_csv.setEnabled(True)
             self.open_file.setEnabled(True)
             QMessageBox.information(self, "Молодец!", "Время вышло! Можешь отдохнуть")
