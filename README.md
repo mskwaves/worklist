@@ -66,7 +66,3 @@ pyinstaller --noconfirm --onefile --windowed --name main --add-data "icons;icons
 
 Одна задача на строку, кодировка UTF-8. При загрузке задачи добавляются
 с приоритетом «Обычный».
-
-## Автор
-
-Степан Киселев, 2026.
